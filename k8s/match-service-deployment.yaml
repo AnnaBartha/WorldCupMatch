@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: match-db-secret
+type: Opaque
+stringData:
+  DB_PASSWORD: BarthaAlma2002
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: match-service-config
+data:
+  DB_URL: jdbc:mysql://match-db:3306/match_db
+  DB_USERNAME: root
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: match-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: match-db
+  template:
+    metadata:
+      labels:
+        app: match-db
+    spec:
+      containers:
+        - name: match-db
+          image: mysql:8.0
+          env:
+            - name: MYSQL_DATABASE
+              value: match_db
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: match-db-secret
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: 3306
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: match-db
+spec:
+  selector:
+    app: match-db
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: match-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: match-service
+  template:
+    metadata:
+      labels:
+        app: match-service
+    spec:
+      containers:
+        - name: match-service
+          image: barthaanna2002/worldcup-match-service:1.0
+          env:
+            - name: DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: match-service-config
+                  key: DB_URL
+            - name: DB_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: match-service-config
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: match-db-secret
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: 8082
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: match-service
+spec:
+  selector:
+    app: match-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: NodePort
